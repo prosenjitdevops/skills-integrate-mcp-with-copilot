@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
+  const activitiesCount = document.getElementById("activities-count");
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
@@ -10,8 +11,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/activities");
       const activities = await response.json();
 
-      // Clear loading message
+      // Clear loading message and reset options to prevent duplicates
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
+
+      // Update activity count in heading
+      const count = Object.keys(activities).length;
+      if (activitiesCount) {
+        activitiesCount.textContent = `(${count})`;
+        activitiesCount.setAttribute(
+          "aria-label",
+          `${count} ${count === 1 ? "activity" : "activities"} available`
+        );
+      }
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -63,6 +75,10 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       activitiesList.innerHTML =
         "<p>Failed to load activities. Please try again later.</p>";
+      if (activitiesCount) {
+        activitiesCount.textContent = "(0)";
+        activitiesCount.setAttribute("aria-label", "0 activities available");
+      }
       console.error("Error fetching activities:", error);
     }
   }
