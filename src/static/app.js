@@ -2,7 +2,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
+  const signupContainer = document.getElementById("signup-container");
   const messageDiv = document.getElementById("message");
+  const userMenuToggle = document.getElementById("user-menu-toggle");
+  const userMenuOptions = document.getElementById("user-menu-options");
+  const loginButton = document.getElementById("login-button");
+  const logoutButton = document.getElementById("logout-button");
+  const loginDialog = document.getElementById("login-dialog");
+  const loginForm = document.getElementById("login-form");
+  const loginError = document.getElementById("login-error");
+
+  let isTeacher = false;
+
+  function setTeacherMode(authenticated) {
+    isTeacher = authenticated;
+    signupContainer.hidden = !authenticated;
+    loginButton.classList.toggle("hidden", authenticated);
+    logoutButton.classList.toggle("hidden", !authenticated);
+    userMenuToggle.setAttribute("aria-label", authenticated
+      ? "Teacher account, signed in"
+      : "Teacher account");
+    fetchActivities();
+  }
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -12,6 +33,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML =
+        '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -29,8 +52,10 @@ document.addEventListener("DOMContentLoaded", () => {
               <ul class="participants-list">
                 ${details.participants
                   .map(
-                    (email) =>
-                      `<li><span class="participant-email">${email}</span><button class="delete-btn" data-activity="${name}" data-email="${email}">❌</button></li>`
+                    (email) => {
+                      const isRegisteredTeacher = isTeacher;
+                      return `<li><span class="participant-email">${email}</span><button class="delete-btn" data-activity="${name}" data-email="${email}" ${isRegisteredTeacher ? "" : "hidden"}>Remove</button></li>`;
+                    }
                   )
                   .join("")}
               </ul>
@@ -69,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Handle unregister functionality
   async function handleUnregister(event) {
-    const button = event.target;
+    const button = event.currentTarget;
     const activity = button.getAttribute("data-activity");
     const email = button.getAttribute("data-email");
 
@@ -84,6 +109,10 @@ document.addEventListener("DOMContentLoaded", () => {
       );
 
       const result = await response.json();
+
+      if (response.status === 401) {
+        setTeacherMode(false);
+      }
 
       if (response.ok) {
         messageDiv.textContent = result.message;
@@ -110,6 +139,72 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  userMenuToggle.addEventListener("click", () => {
+    const isExpanded = userMenuToggle.getAttribute("aria-expanded") === "true";
+    userMenuToggle.setAttribute("aria-expanded", String(!isExpanded));
+    userMenuOptions.classList.toggle("hidden", isExpanded);
+  });
+
+  loginButton.addEventListener("click", () => {
+    userMenuOptions.classList.add("hidden");
+    userMenuToggle.setAttribute("aria-expanded", "false");
+    loginError.classList.add("hidden");
+    loginDialog.showModal();
+  });
+
+  document.getElementById("cancel-login").addEventListener("click", () => {
+    loginDialog.close();
+  });
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    loginError.classList.add("hidden");
+
+    const formData = new FormData(loginForm);
+    try {
+      const response = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: formData.get("username"),
+          password: formData.get("password"),
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        loginError.textContent = result.detail || "Unable to log in.";
+        loginError.classList.remove("hidden");
+        return;
+      }
+
+      loginForm.reset();
+      loginDialog.close();
+      setTeacherMode(true);
+    } catch (error) {
+      loginError.textContent = "Failed to log in. Please try again.";
+      loginError.classList.remove("hidden");
+      console.error("Error logging in:", error);
+    }
+  });
+
+  logoutButton.addEventListener("click", async () => {
+    try {
+      const response = await fetch("/auth/logout", { method: "POST" });
+      if (!response.ok) {
+        throw new Error("The server could not end the teacher session.");
+      }
+      userMenuOptions.classList.add("hidden");
+      userMenuToggle.setAttribute("aria-expanded", "false");
+      setTeacherMode(false);
+    } catch (error) {
+      messageDiv.textContent = "Failed to log out. Please try again.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      console.error("Error logging out:", error);
+    }
+  });
+
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -128,6 +223,10 @@ document.addEventListener("DOMContentLoaded", () => {
       );
 
       const result = await response.json();
+
+      if (response.status === 401) {
+        setTeacherMode(false);
+      }
 
       if (response.ok) {
         messageDiv.textContent = result.message;
@@ -156,5 +255,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Initialize app
-  fetchActivities();
+  fetch("/auth/session")
+    .then((response) => response.json())
+    .then((result) => {
+      setTeacherMode(result.authenticated);
+    })
+    .catch((error) => {
+      console.error("Error checking teacher session:", error);
+      fetchActivities();
+    });
 });

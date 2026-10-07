@@ -16,4 +16,4 @@ Add a user icon in the top right. When clicked it shows a login button. When the
 
 ## Context
 
-Since there is no database yet, please store the teacher usernames and passwords in a `json` file that is checked by the backend.
+Since there is no database yet, configure teacher credentials through environment variables rather than storing passwords in a file checked into source control.
