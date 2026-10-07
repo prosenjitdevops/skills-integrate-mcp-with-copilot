@@ -6,15 +6,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Function to fetch activities from API
   async function fetchActivities() {
+    // Show accessible loading indicator while fetching
+    activitiesList.innerHTML = `
+      <div class="loading-state" role="status" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>Loading activities...</p>
+      </div>
+    `;
+
     try {
       const response = await fetch("/activities");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const activities = await response.json();
 
-      // Clear loading message
+      // Clear loading message and reset options to prevent duplicates
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
+
+      const entries = Object.entries(activities);
+
+      // Handle distinct empty state
+      if (entries.length === 0) {
+        activitiesList.innerHTML = '<p class="empty-state">No activities currently available.</p>';
+        return;
+      }
 
       // Populate activities list
-      Object.entries(activities).forEach(([name, details]) => {
+      entries.forEach(([name, details]) => {
         const activityCard = document.createElement("div");
         activityCard.className = "activity-card";
 
@@ -61,8 +81,9 @@ document.addEventListener("DOMContentLoaded", () => {
         button.addEventListener("click", handleUnregister);
       });
     } catch (error) {
+      // Distinct error state
       activitiesList.innerHTML =
-        "<p>Failed to load activities. Please try again later.</p>";
+        '<p class="error-state" role="alert">Failed to load activities. Please try again later.</p>';
       console.error("Error fetching activities:", error);
     }
   }
